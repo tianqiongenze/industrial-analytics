@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工业遥测分析平台 | Industrial Analytics Dashboard</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --accent-purple: #8b5cf6;
+            --border: #475569;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -2px rgba(0,0,0,0.2);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 20px 30px; background: var(--bg-secondary);
+            border-radius: var(--radius); margin-bottom: 20px; box-shadow: var(--shadow);
+        }
+        .header h1 { font-size: 1.8rem; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header .status-badge { padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+        .status-healthy { background: rgba(16,185,129,0.15); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.3); }
+        .status-error { background: rgba(239,68,68,0.15); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.3); }
+        .status-loading { background: rgba(245,158,11,0.15); color: var(--accent-yellow); border: 1px solid rgba(245,158,11,0.3); }
+        .grid { display: grid; gap: 20px; max-width: 1400px; margin: 0 auto; }
+        .row { display: grid; gap: 20px; }
+        .row-4 { grid-template-columns: repeat(4, 1fr); }
+        .row-3 { grid-template-columns: repeat(3, 1fr); }
+        .row-2 { grid-template-columns: 1fr 1fr; }
+        @media (max-width: 1024px) { .row-4 { grid-template-columns: repeat(2,1fr); } .row-3, .row-2 { grid-template-columns: 1fr; } }
+        @media (max-width: 640px) { .row-4 { grid-template-columns: 1fr; } }
+        .card {
+            background: var(--bg-secondary); border-radius: var(--radius);
+            padding: 24px; box-shadow: var(--shadow); border: 1px solid var(--border);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.4); }
+        .card h3 { font-size: 1.1rem; margin-bottom: 16px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; }
+        .stat-value { font-size: 2.5rem; font-weight: 700; }
+        .stat-label { font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; }
+        .stat-blue { color: var(--accent-blue); }
+        .stat-green { color: var(--accent-green); }
+        .stat-red { color: var(--accent-red); }
+        .stat-yellow { color: var(--accent-yellow); }
+        .stat-purple { color: var(--accent-purple); }
+        input, select, button {
+            background: var(--bg-card); border: 1px solid var(--border);
+            color: var(--text-primary); padding: 10px 14px; border-radius: 8px;
+            font-size: 0.9rem; outline: none; transition: border-color 0.2s;
+        }
+        input:focus, select:focus { border-color: var(--accent-blue); }
+        button { cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        button:hover { opacity: 0.9; }
+        .btn-primary { background: var(--accent-blue); border: none; }
+        .btn-success { background: var(--accent-green); border: none; }
+        .btn-danger { background: var(--accent-red); border: none; }
+        .form-group { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+        .form-group label { font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; }
+        tr:hover { background: var(--bg-card); }
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+        .badge-normal { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+        .badge-warning { background: rgba(245,158,11,0.15); color: var(--accent-yellow); }
+        .badge-critical { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+        .chart-container { position: relative; height: 200px; margin-top: 10px; }
+        .toast { position: fixed; bottom: 20px; right: 20px; padding: 16px 24px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow); z-index: 1000; display: none; }
+        .toast.show { display: block; animation: slideIn 0.3s; }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .api-log { background: #0c1117; border-radius: 8px; padding: 12px; max-height: 200px; overflow-y: auto; font-family: 'Fira Code', monospace; font-size: 0.8rem; }
+        .api-log .log-entry { margin-bottom: 4px; color: var(--text-secondary); }
+        .api-log .log-ok { color: var(--accent-green); }
+        .api-log .log-err { color: var(--accent-red); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏭 工业遥测分析平台</h1>
+        <div id="healthBadge" class="status-badge status-loading">检查中...</div>
+    </div>
+
+    <div class="grid">
+        <!-- Stats Row -->
+        <div class="row row-4">
+            <div class="card">
+                <h3>📊 遥测总数</h3>
+                <div class="stat-value stat-blue" id="statCount">--</div>
+                <div class="stat-label">Telemetry Records</div>
+            </div>
+            <div class="card">
+                <h3>⚡ 缓存类型</h3>
+                <div class="stat-value stat-purple" id="statCache">--</div>
+                <div class="stat-label">Cache Engine</div>
+            </div>
+            <div class="card">
+                <h3>🟢 正常设备</h3>
+                <div class="stat-value stat-green" id="statNormal">--</div>
+                <div class="stat-label">Normal Status</div>
+            </div>
+            <div class="card">
+                <h3>🔴 异常设备</h3>
+                <div class="stat-value stat-red" id="statAnomaly">--</div>
+                <div class="stat-label">Anomalies Detected</div>
+            </div>
+        </div>
+
+        <!-- Ingest Telemetry -->
+        <div class="card">
+            <h3>📥 发送遥测数据</h3>
+            <div class="form-group">
+                <div>
+                    <label>设备ID</label>
+                    <input type="text" id="deviceId" value="PUMP-001" placeholder="PUMP-001">
+                </div>
+                <div>
+                    <label>指标</label>
+                    <select id="metric">
+                        <option value="temperature">温度 temperature</option>
+                        <option value="vibration">振动 vibration</option>
+                        <option value="pressure">压力 pressure</option>
+                        <option value="current">电流 current</option>
+                        <option value="rpm">转速 rpm</option>
+                    </select>
+                </div>
+                <div>
+                    <label>数值</label>
+                    <input type="number" id="value" value="75.5" step="0.1">
+                </div>
+                <div>
+                    <label>单位</label>
+                    <input type="text" id="unit" value="°C" style="width:60px">
+                </div>
+                <button class="btn-primary" onclick="ingestTelemetry()">发送数据</button>
+                <button class="btn-success" onclick="sendBatch()">批量发送 10 条</button>
+            </div>
+        </div>
+
+        <!-- Analytics Query -->
+        <div class="card">
+            <h3>📈 异常分析查询</h3>
+            <div class="form-group">
+                <div>
+                    <label>设备ID</label>
+                    <input type="text" id="analyticsDevice" value="PUMP-001">
+                </div>
+                <div>
+                    <label>指标</label>
+                    <select id="analyticsMetric">
+                        <option value="temperature">温度</option>
+                        <option value="vibration">振动</option>
+                        <option value="pressure">压力</option>
+                        <option value="current">电流</option>
+                        <option value="rpm">转速</option>
+                    </select>
+                </div>
+                <div>
+                    <label>窗口大小</label>
+                    <input type="number" id="window" value="100" min="2" max="10000" style="width:80px">
+                </div>
+                <button class="btn-primary" onclick="runAnalytics()">查询分析</button>
+            </div>
+        </div>
+
+        <!-- Analytics Results -->
+        <div class="row row-3" id="analyticsResults" style="display:none">
+            <div class="card">
+                <h3>均值 Mean</h3>
+                <div class="stat-value stat-blue" id="resMean">--</div>
+                <div class="stat-label">Moving Average</div>
+            </div>
+            <div class="card">
+                <h3>标准差 Std</h3>
+                <div class="stat-value stat-yellow" id="resStd">--</div>
+                <div class="stat-label">Standard Deviation</div>
+            </div>
+            <div class="card">
+                <h3>异常检测</h3>
+                <div class="stat-value stat-red" id="resAnomalies">--</div>
+                <div class="stat-label">Z-score / IQR Anomalies</div>
+            </div>
+        </div>
+
+        <!-- Analytics Details -->
+        <div class="card" id="analyticsDetails" style="display:none">
+            <h3>📋 分析详情</h3>
+            <table>
+                <thead><tr><th>指标</th><th>值</th><th>指标</th><th>值</th></tr></thead>
+                <tbody>
+                    <tr><td>最小值 Min</td><td id="resMin">--</td><td>最大值 Max</td><td id="resMax">--</td></tr>
+                    <tr><td>数据量 Count</td><td id="resCount">--</td><td>Z-score 异常</td><td id="resZscore">--</td></tr>
+                    <tr><td>IQR 异常</td><td id="resIqr">--</td><td>设备ID</td><td id="resDevice">--</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Device Status Table -->
+        <div class="card">
+            <h3>🖥️ 设备状态列表</h3>
+            <table>
+                <thead><tr><th>设备ID</th><th>状态</th><th>最新值</th><th>异常数</th><th>操作</th></tr></thead>
+                <tbody id="deviceTable"></tbody>
+            </table>
+        </div>
+
+        <!-- Cache Stats -->
+        <div class="card">
+            <h3>💾 缓存统计 (L1 内存 + L2 Redis)</h3>
+            <div id="cacheStats" style="display:flex; gap:20px; flex-wrap:wrap;"></div>
+        </div>
+
+        <!-- API Log -->
+        <div class="card">
+            <h3>🔌 API 调用日志</h3>
+            <div class="api-log" id="apiLog"></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const API_BASE = window.location.origin.replace(/\/hub.*/, '') + '/api/v1';
+
+        function showToast(msg, type='info') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast show';
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        function logApi(method, url, status, data) {
+            const log = document.getElementById('apiLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            const time = new Date().toLocaleTimeString();
+            const cls = status >= 200 && status < 300 ? 'log-ok' : 'log-err';
+            entry.className += ' ' + cls;
+            entry.textContent = `[${time}] ${method} ${url} → ${status} ${data ? JSON.stringify(data).substring(0,120) : ''}`;
+            log.insertBefore(entry, log.firstChild);
+            while (log.children.length > 30) log.removeChild(log.lastChild);
+        }
+
+        async function apiCall(method, path, body) {
+            const url = API_BASE + path;
+            const opts = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) opts.body = JSON.stringify(body);
+            try {
+                const resp = await fetch(url, opts);
+                const data = await resp.json().catch(() => ({}));
+                logApi(method, path, resp.status, data);
+                return { status: resp.status, data };
+            } catch(e) {
+                logApi(method, path, 'ERR', { error: e.message });
+                return { status: 0, data: { error: e.message } };
+            }
+        }
+
+        async function checkHealth() {
+            const badge = document.getElementById('healthBadge');
+            const r = await apiCall('GET', '/health');
+            if (r.status === 200) {
+                badge.className = 'status-badge status-healthy';
+                badge.textContent = '✅ 服务正常';
+                document.getElementById('statCount').textContent = r.data.telemetry_count;
+                document.getElementById('statCache').textContent = r.data.cache;
+            } else {
+                badge.className = 'status-badge status-error';
+                badge.textContent = '❌ 服务异常';
+            }
+        }
+
+        async function ingestTelemetry() {
+            const body = {
+                device_id: document.getElementById('deviceId').value,
+                metric: document.getElementById('metric').value,
+                value: parseFloat(document.getElementById('value').value),
+                unit: document.getElementById('unit').value
+            };
+            const r = await apiCall('POST', '/telemetry', body);
+            if (r.status === 201) {
+                showToast(`✅ 遥测已记录: ${r.data.device_id} 状态=${r.data.status}`, 'success');
+                checkHealth();
+                refreshDevices();
+            } else {
+                showToast(`❌ 失败: ${r.data.detail || 'unknown'}`, 'error');
+            }
+        }
+
+        async function sendBatch() {
+            const device = document.getElementById('deviceId').value;
+            const metric = document.getElementById('metric').value;
+            let ok = 0, err = 0;
+            for (let i = 0; i < 10; i++) {
+                const val = 70 + Math.random() * 20 + (i > 7 ? 30 : 0); // inject anomalies
+                const r = await apiCall('POST', '/telemetry', {
+                    device_id: device, metric, value: parseFloat(val.toFixed(1)),
+                    unit: document.getElementById('unit').value
+                });
+                if (r.status === 201) ok++; else err++;
+                await new Promise(res => setTimeout(res, 100));
+            }
+            showToast(`批量完成: ${ok} 成功, ${err} 失败`, 'info');
+            checkHealth();
+            refreshDevices();
+        }
+
+        async function runAnalytics() {
+            const params = new URLSearchParams({
+                device_id: document.getElementById('analyticsDevice').value,
+                metric: document.getElementById('analyticsMetric').value,
+                window: document.getElementById('window').value
+            });
+            const r = await apiCall('GET', '/analytics?' + params.toString());
+            if (r.status === 200) {
+                document.getElementById('analyticsResults').style.display = '';
+                document.getElementById('analyticsDetails').style.display = '';
+                document.getElementById('resMean').textContent = r.data.mean.toFixed(2);
+                document.getElementById('resStd').textContent = r.data.std.toFixed(2);
+                document.getElementById('resAnomalies').textContent = `${r.data.anomalies_zscore} / ${r.data.anomalies_iqr}`;
+                document.getElementById('resMin').textContent = r.data.min.toFixed(2);
+                document.getElementById('resMax').textContent = r.data.max.toFixed(2);
+                document.getElementById('resCount').textContent = r.data.count;
+                document.getElementById('resZscore').textContent = r.data.anomalies_zscore;
+                document.getElementById('resIqr').textContent = r.data.anomalies_iqr;
+                document.getElementById('resDevice').textContent = r.data.device_id;
+            } else {
+                showToast(`❌ 查询失败: ${r.data.detail || 'no data'}`, 'error');
+            }
+        }
+
+        const knownDevices = ['PUMP-001', 'PUMP-002', 'MOTOR-001', 'COMP-001', 'TURBINE-01'];
+        async function refreshDevices() {
+            const tbody = document.getElementById('deviceTable');
+            tbody.innerHTML = '';
+            let normal = 0, anomaly = 0;
+            for (const dev of knownDevices) {
+                const r = await apiCall('GET', '/status/' + dev);
+                const row = document.createElement('tr');
+                if (r.status === 200) {
+                    const status = r.data.status;
+                    const badgeClass = status === 'normal' ? 'badge-normal' : status === 'warning' ? 'badge-warning' : 'badge-critical';
+                    if (status === 'normal') normal++; else anomaly++;
+                    row.innerHTML = `<td>${r.data.device_id}</td>
+                        <td><span class="badge ${badgeClass}">${status.toUpperCase()}</span></td>
+                        <td>${r.data.last_value.toFixed(2)}</td>
+                        <td>${r.data.anomalies}</td>
+                        <td><button class="btn-primary" onclick="document.getElementById('analyticsDevice').value='${dev}';runAnalytics()">分析</button></td>`;
+                } else {
+                    row.innerHTML = `<td>${dev}</td><td><span class="badge badge-warning">NO DATA</span></td><td>--</td><td>--</td><td>--</td>`;
+                }
+                tbody.appendChild(row);
+            }
+            document.getElementById('statNormal').textContent = normal;
+            document.getElementById('statAnomaly').textContent = anomaly;
+        }
+
+        async function loadCacheStats() {
+            const r = await apiCall('GET', '/cache-stats');
+            const div = document.getElementById('cacheStats');
+            if (r.status === 200) {
+                div.innerHTML = Object.entries(r.data).map(([k,v]) =>
+                    `<div><div class="stat-label">${k}</div><div class="stat-value stat-blue" style="font-size:1.5rem">${typeof v === 'object' ? JSON.stringify(v) : v}</div></div>`
+                ).join('');
+            } else {
+                div.innerHTML = '<div class="stat-label">缓存统计不可用</div>';
+            }
+        }
+
+        // Init
+        checkHealth();
+        refreshDevices();
+        loadCacheStats();
+        setInterval(checkHealth, 30000);
+    </script>
+</body>
+</html>

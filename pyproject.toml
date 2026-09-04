@@ -1,0 +1,11 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra"
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = ["*/__init__.py"]
+[tool.coverage.report]
+show_missing = true
+precision = 2
